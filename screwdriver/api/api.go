@@ -52,7 +52,7 @@ type Command struct {
 	Binary struct {
 		File string `json:"file"`
 	} `json:"binary"`
-	PipelineId   string `json:"pipelineId"`
+	PipelineId string `json:"pipelineId"`
 }
 
 func (e ResponseError) Error() string {
@@ -102,6 +102,39 @@ func handleResponse(res *http.Response) ([]byte, error) {
 
 // GetCommand returns Command from Screwdriver API
 func (c client) GetCommand(smallSpec *Command) (*Command, error) {
+	cmd := new(Command)
+	uri, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("The base Screwdriver API is invalid %q", c.baseURL)
+	}
+	uri.Path = path.Join(uri.Path, "commands", smallSpec.Namespace, smallSpec.Name, smallSpec.Version)
+	req, err := http.NewRequest("GET", uri.String(), strings.NewReader(""))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create request about command to Screwdriver API: %v", err)
+	}
+
+	req.Header.Set("Content-type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.jwt))
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get command from Screwdriver API: %v", err)
+	}
+	defer res.Body.Close()
+	body, err := handleResponse(res)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(body, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal command: %v", err)
+	}
+	return cmd, nil
+}
+
+// PostCommand returns Command from Screwdriver API
+func (c client) PostCommand(smallSpec *Command) (*Command, error) {
 	cmd := new(Command)
 	uri, err := url.Parse(c.baseURL)
 	if err != nil {
